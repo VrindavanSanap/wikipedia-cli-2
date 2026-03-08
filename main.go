@@ -18,13 +18,27 @@ type debounceMsg struct {
 	tag   int
 	query string
 }
-type model struct {
+type sessionState int
+type searchModel struct {
 	articles    wikiSearchResponse
 	cursor      int
 	textInput   textinput.Model
 	cancel      context.CancelFunc
 	debounceTag int
 }
+type articleModel struct {
+	article wikiPage
+}
+type model struct {
+	state   sessionState
+	search  searchModel
+	article articleModel
+}
+
+const (
+	searchState sessionState = iota
+	articleState
+)
 
 func debounceCmd(tag int, query string) tea.Cmd {
 	return func() tea.Msg {
@@ -41,11 +55,19 @@ func initialModel() model {
 	ti.CharLimit = 156
 	ti.SetWidth(20)
 	return model{
-		cursor:    0,
-		textInput: ti,
+		search: searchModel{
+			cursor:    0,
+			textInput: ti,
+		},
 	}
 }
 func (m model) Init() tea.Cmd {
+	return nil
+}
+func (m searchModel) Init() tea.Cmd {
+	return nil
+}
+func (m articleModel) Init() tea.Cmd {
 	return nil
 }
 
@@ -53,7 +75,7 @@ var wikiClient = &http.Client{
 	Timeout: 15 * time.Second,
 }
 
-func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 
@@ -122,8 +144,38 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	// tea.Batch runs all queued commands concurrently
 	return m, tea.Batch(cmds...)
+
+}
+func (m articleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	return m, nil
+}
+func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	switch m.state {
+	case searchState:
+		newSearch, searchCmd := m.search.Update(msg)
+		// 2. Cast it back to our specific type
+		m.search = newSearch.(searchModel)
+		cmd = searchCmd
+	case articleState:
+		return m, cmd
+	}
+	return m, cmd
 }
 func (m model) View() tea.View {
+	switch m.state {
+	case articleState:
+		return m.article.View()
+	default:
+		return m.search.View()
+	}
+}
+func (m articleModel) View() tea.View {
+	return tea.NewView(m.article.Title)
+}
+
+func (m searchModel) View() tea.View {
+
 	str :=
 		m.textInput.View() +
 			m.headerView() +
@@ -134,12 +186,12 @@ func (m model) View() tea.View {
 }
 
 // Helper for the title
-func (m model) headerView() string {
+func (m searchModel) headerView() string {
 	return "\n  Wikipedia Search Results:\n"
 }
 
 // Helper for the interactive list logic
-func (m model) listView() string {
+func (m searchModel) listView() string {
 	var b strings.Builder
 	for i, page := range m.articles.Pages {
 		cursor := " "
@@ -152,7 +204,7 @@ func (m model) listView() string {
 }
 
 // Helper for navigation hints
-func (m model) footerView() string {
+func (m searchModel) footerView() string {
 	return "\n  Press 'up'/'down' to move, 'Esc' to quit.\n"
 }
 

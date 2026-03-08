@@ -2,14 +2,10 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
-	"io"
 	"net/http"
-	"net/url"
 	"os"
-	"strconv"
 	"strings"
 	"time"
 
@@ -160,44 +156,27 @@ func (m model) footerView() string {
 	return "\n  Press 'up'/'down' to move, 'Esc' to quit.\n"
 }
 
+type errMsg struct{ err error }
+
+func (e errMsg) Error() string { return e.err.Error() }
+
 func fetchSearchResults(ctx context.Context, searchQuery string) tea.Cmd {
 	return func() tea.Msg {
-		var searchResults wikiSearchResponse
 		limit := 10
-		baseSearchURL := "https://en.wikipedia.org/w/rest.php/v1/search/page?"
 
-		u, err := url.Parse(baseSearchURL)
+		// Call the abstracted API function
+		results, err := searchWikipedia(ctx, wikiClient, searchQuery, limit)
 		if err != nil {
-			return searchResults
-		}
-		params := url.Values{}
-		params.Add("q", searchQuery)
-		params.Add("limit", strconv.Itoa(limit))
-
-		u.RawQuery = params.Encode()
-		fullSearchURL := u.String()
-
-		req, err := http.NewRequestWithContext(ctx, "GET", fullSearchURL, nil)
-		if err != nil {
-			return searchResults
-		}
-		req.Header.Set("User-Agent", "MyGoWikiTool/1.0 (contact: user@example.com)")
-		resp, err := wikiClient.Do(req)
-		if err != nil {
+			// Handle the specific cancellation case
 			if errors.Is(err, context.Canceled) {
 				return searchCancelledMsg{}
 			}
-			return searchResults
+			// Return a dedicated error message instead of an empty struct
+			return errMsg{err}
 		}
-		defer resp.Body.Close()
-		body, err := io.ReadAll(resp.Body)
-		if err != nil {
-			return searchResults
-		}
-		if err := json.Unmarshal(body, &searchResults); err != nil {
-			return searchResults
-		}
-		return searchResults
+
+		// Return the successful payload
+		return results
 	}
 }
 func main() {

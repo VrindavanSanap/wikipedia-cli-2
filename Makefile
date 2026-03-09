@@ -9,7 +9,7 @@ all: build
 ## build: Create the bin directory and build the binary into it
 build:
 	@mkdir -p $(BIN_DIR)
-	go build -o $(BINARY_PATH) main.go structs.go
+	go build -o $(BINARY_PATH) . 
 
 ## run: Build and run from the bin folder
 run: build

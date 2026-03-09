@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"charm.land/bubbles/v2/textinput"
+	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
 )
 
@@ -37,6 +38,7 @@ type articleModel struct {
 	article  wikiPage
 	markdown string
 	rendered string
+	viewport viewport.Model
 }
 
 const (
@@ -160,17 +162,21 @@ func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 }
 func (m articleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	var cmd tea.Cmd
+	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
 		case "ctrl+c":
 			return m, tea.Quit
 		}
-	
+
 	case tea.WindowSizeMsg:
 		m.rendered = applyGlamour(m.markdown, msg.Width)
 	}
-	return m, nil
+	m.viewport, cmd = m.viewport.Update(msg)
+	cmds = append(cmds, cmd)
+	return m, tea.Batch(cmds...) 
 }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -197,11 +203,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					if err != nil {
 						fmt.Printf("Failed to fetch article: %v", err)
 					}
+					m.article.article = selectedArticle
 					m.article.markdown = markdown
 					m.article.rendered = applyGlamour(m.article.markdown, m.width)
 					// 3. Assign it to the article model
-					m.article.article = selectedArticle
-
+					m.article.viewport = viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(m.height))
+					m.article.viewport.SetContent(m.article.rendered)
 					// 4. Switch the state
 					m.state = articleState
 
@@ -240,7 +247,7 @@ func (m model) View() tea.View {
 	return v
 }
 func (m articleModel) View() tea.View {
-	return tea.NewView(m.rendered)
+	return tea.NewView(m.viewport.View())
 }
 
 func (m searchModel) View() tea.View {
@@ -274,7 +281,7 @@ func (m searchModel) listView() string {
 
 // Helper for navigation hints
 func (m searchModel) footerView() string {
-	return "\n  Press 'up'/'down' to move, 'Esc' to quit.\n"
+	return "\n  Press 'up'/'down' to move, 'Enter' to select, 'Esc' to quit.\n"
 }
 
 type errMsg struct{ err error }

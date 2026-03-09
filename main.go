@@ -19,6 +19,7 @@ type sessionState int
 //  ---MODELS---
 
 type model struct {
+	client  *http.Client
 	state   sessionState
 	search  searchModel
 	article articleModel
@@ -27,6 +28,7 @@ type model struct {
 }
 
 type searchModel struct {
+	client      *http.Client
 	articles    wikiSearchResponse
 	cursor      int
 	textInput   textinput.Model
@@ -60,7 +62,7 @@ func debounceCmd(tag int, query string) tea.Cmd {
 	}
 }
 
-func initialModel() model {
+func initialModel(client *http.Client) model {
 	ti := textinput.New()
 	ti.Placeholder = "Start searching..."
 	ti.SetVirtualCursor(false)
@@ -68,7 +70,9 @@ func initialModel() model {
 	ti.CharLimit = 156
 	ti.SetWidth(20)
 	return model{
+		client: client,
 		search: searchModel{
+			client:    client,
 			cursor:    0,
 			textInput: ti,
 		},
@@ -82,10 +86,6 @@ func (m searchModel) Init() tea.Cmd {
 }
 func (m articleModel) Init() tea.Cmd {
 	return nil
-}
-
-var wikiClient = &http.Client{
-	Timeout: 15 * time.Second,
 }
 
 // ------ UPDATE -------
@@ -104,7 +104,7 @@ func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			}
 			var ctx context.Context
 			ctx, m.cancel = context.WithCancel(context.Background())
-			return m, fetchSearchResults(ctx, msg.query)
+			return m, fetchSearchResults(ctx, m.client, msg.query)
 		}
 		return m, nil
 	case wikiSearchResponse:
@@ -179,7 +179,7 @@ func (m articleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
-	return m, tea.Batch(cmds...) 
+	return m, tea.Batch(cmds...)
 }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
@@ -202,7 +202,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.search.articles.Pages) > 0 {
 					// 2. Grab the specific article based on the search cursor
 					selectedArticle := m.search.articles.Pages[m.search.cursor]
-					markdown, err := fetchAndParseArticle(selectedArticle.Key)
+					markdown, err := fetchAndParseArticle(m.client, selectedArticle.Key)
 					if err != nil {
 						fmt.Printf("Failed to fetch article: %v", err)
 					}
@@ -291,12 +291,12 @@ type errMsg struct{ err error }
 
 func (e errMsg) Error() string { return e.err.Error() }
 
-func fetchSearchResults(ctx context.Context, searchQuery string) tea.Cmd {
+func fetchSearchResults(ctx context.Context, client *http.Client, searchQuery string) tea.Cmd {
 	return func() tea.Msg {
 		limit := 10
 
 		// Call the abstracted API function
-		results, err := searchWikipedia(ctx, wikiClient, searchQuery, limit)
+		results, err := searchWikipedia(ctx, client, searchQuery, limit)
 		if err != nil {
 			// Handle the specific cancellation case
 			if errors.Is(err, context.Canceled) {
@@ -311,8 +311,10 @@ func fetchSearchResults(ctx context.Context, searchQuery string) tea.Cmd {
 	}
 }
 func main() {
-
-	p := tea.NewProgram(initialModel())
+	client := &http.Client{
+		Timeout: 15 * time.Second,
+	}
+	p := tea.NewProgram(initialModel(client))
 	if _, err := p.Run(); err != nil {
 		fmt.Printf("Alas, there's been an error: %v", err)
 		os.Exit(1)

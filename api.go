@@ -48,11 +48,11 @@ func searchWikipedia(ctx context.Context, client *http.Client, query string, lim
 	return result, nil
 }
 
-func fetchArticle(key string) (string, error) {
+func fetchArticle(client *http.Client, key string) (string, error) {
 	reqURL := "https://en.wikipedia.org/w/rest.php/v1/page/" + url.PathEscape(key) + "/html"
 	req, _ := http.NewRequest("GET", reqURL, nil)
 	req.Header.Set("User-Agent", "wikipedia-live-cli/1.0")
-	resp, err := httpClient.Do(req)
+	resp, err := client.Do(req)
 	if err != nil {
 		return "", err
 	}

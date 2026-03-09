@@ -5,7 +5,6 @@ import (
 	"net/http"
 	"regexp"
 	"strings"
-	"time"
 
 	"github.com/JohannesKaufmann/html-to-markdown/v2/converter"
 	"github.com/JohannesKaufmann/html-to-markdown/v2/plugin/base"
@@ -19,8 +18,8 @@ import (
 // ── Glamour Custom Styles ─────────────────────────────────────────────────────
 
 func strPtr(s string) *string { return &s }
-func boolPtr(b bool) *bool  { return &b }
-func uintPtr(u uint) *uint  { return &u }
+func boolPtr(b bool) *bool    { return &b }
+func uintPtr(u uint) *uint    { return &u }
 
 var articleRenderStyles = ansi.StyleConfig{
 	Document: ansi.StyleBlock{
@@ -143,9 +142,6 @@ var articleRenderStyles = ansi.StyleConfig{
 
 // ── Wikipedia API ─────────────────────────────────────────────────────────────
 
-var httpClient = &http.Client{Timeout: 15 * time.Second}
-
-
 // ── HTML pre-cleaner ──────────────────────────────────────────────────────────
 
 var sectionsToTrim = map[string]bool{
@@ -253,7 +249,7 @@ var (
 )
 
 func cleanMarkdown(md string) string {
-	md = mdImageRe.ReplaceAllString(md, "") 
+	md = mdImageRe.ReplaceAllString(md, "")
 	md = citationRe.ReplaceAllString(md, "")
 	md = mdLinkRe.ReplaceAllString(md, "[$1]()") // Format links as dummies for highlighting
 	md = editWordRe.ReplaceAllString(md, "")
@@ -278,8 +274,8 @@ func markdownFromHTML(htmlContent string) (string, error) {
 }
 
 // ── Main Execution ────────────────────────────────────────────────────────────
-func fetchAndParseArticle(articleKey string) (string, error) {
-	htmlContent, err := fetchArticle(articleKey)
+func fetchAndParseArticle(client *http.Client, articleKey string) (string, error) {
+	htmlContent, err := fetchArticle(client, articleKey)
 	if err != nil {
 		return "", err
 	}
@@ -293,7 +289,7 @@ func fetchAndParseArticle(articleKey string) (string, error) {
 
 }
 
-func applyGlamour(markdown string, terminalWidth int) (string) {
+func applyGlamour(markdown string, terminalWidth int) string {
 
 	// 5. Render with Glamour using the custom style struct
 	r, err := glamour.NewTermRenderer(

@@ -21,7 +21,7 @@ brew install wikipedia-cli
 Clone the repository and install dependencies:
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/VrindavanSanap/wikipedia-cli.git
 cd wikipedia-cli-2
 go mod download
 ```

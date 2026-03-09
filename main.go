@@ -147,6 +147,13 @@ func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 }
 func (m articleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+	switch msg := msg.(type) {
+	case tea.KeyMsg:
+		switch msg.String() {
+		case "ctrl+c":
+			return m, tea.Quit
+		}
+	}
 	return m, nil
 }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -157,8 +164,34 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		// 2. Cast it back to our specific type
 		m.search = newSearch.(searchModel)
 		cmd = searchCmd
+		if keyMsg, ok := msg.(tea.KeyMsg); ok {
+			if keyMsg.String() == "enter" {
+				if len(m.search.articles.Pages) > 0 {
+					// 2. Grab the specific article based on the search cursor
+					selectedArticle := m.search.articles.Pages[m.search.cursor]
+
+					// 3. Assign it to the article model
+					m.article.article = selectedArticle
+
+					// 4. Switch the state
+					m.state = articleState
+
+					// 5. Important: Return immediately to stop the search model
+					// from processing 'enter' further
+					return m, nil
+				}
+			}
+		}
 	case articleState:
-		return m, cmd
+		newArticle, articleCmd := m.article.Update(msg)
+		m.article = newArticle.(articleModel)
+		cmd = articleCmd
+
+		// Handle going back to search
+		if keyMsg, ok := msg.(tea.KeyMsg); ok && keyMsg.String() == "esc" {
+			m.state = searchState
+			return m, nil
+		}
 	}
 	return m, cmd
 }

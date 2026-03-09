@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"log"
 	"net/http"
 	"regexp"
@@ -293,13 +292,8 @@ func fetchAndParseArticle(articleKey string) (string, error) {
 	return markdown, nil
 
 }
-func renderArticle(articleKey string)string {
-	terminalWidth := 100
 
-	fmt.Printf("Fetching %s...\n\n", articleKey)
-
-	// 1. Fetch
-	markdown, err := fetchAndParseArticle(articleKey)
+func applyGlamour(markdown string, terminalWidth int) (string) {
 
 	// 5. Render with Glamour using the custom style struct
 	r, err := glamour.NewTermRenderer(

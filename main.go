@@ -35,6 +35,7 @@ type searchModel struct {
 
 type articleModel struct {
 	article  wikiPage
+	markdown string
 	rendered string
 }
 
@@ -165,6 +166,9 @@ func (m articleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "ctrl+c":
 			return m, tea.Quit
 		}
+	
+	case tea.WindowSizeMsg:
+		m.rendered = applyGlamour(m.markdown, msg.Width)
 	}
 	return m, nil
 }
@@ -189,7 +193,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.search.articles.Pages) > 0 {
 					// 2. Grab the specific article based on the search cursor
 					selectedArticle := m.search.articles.Pages[m.search.cursor]
-					m.article.rendered = renderArticle(selectedArticle.Key)
+					markdown, err := fetchAndParseArticle(selectedArticle.Key)
+					if err != nil {
+						fmt.Printf("Failed to fetch article: %v", err)
+					}
+					m.article.markdown = markdown
+					m.article.rendered = applyGlamour(m.article.markdown, m.width)
 					// 3. Assign it to the article model
 					m.article.article = selectedArticle
 

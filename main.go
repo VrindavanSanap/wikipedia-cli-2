@@ -90,7 +90,7 @@ func (m articleModel) Init() tea.Cmd {
 
 // ------ UPDATE -------
 
-func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m searchModel) Update(msg tea.Msg) (searchModel, tea.Cmd) {
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
 
@@ -161,7 +161,7 @@ func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, tea.Batch(cmds...)
 
 }
-func (m articleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
+func (m articleModel) Update(msg tea.Msg) (articleModel, tea.Cmd) {
 	var cmd tea.Cmd
 	var cmds []tea.Cmd
 	switch msg := msg.(type) {
@@ -188,6 +188,17 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
+	case articleFetchedMsg:
+		if msg.err != nil {
+			// handle error
+			return m, nil
+		}
+		m.article.article = msg.article
+		m.article.markdown = msg.markdown
+		m.article.rendered = applyGlamour(msg.markdown, m.width)
+		m.article.viewport = viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(m.height))
+		m.article.viewport.SetContent(m.article.rendered)
+		return m, nil
 
 	}
 	switch m.state {
@@ -195,35 +206,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	case searchState:
 		newSearch, searchCmd := m.search.Update(msg)
 		// 2. Cast it back to our specific type
-		m.search = newSearch.(searchModel)
+		m.search = newSearch
 		cmd = searchCmd
 		if keyMsg, ok := msg.(tea.KeyMsg); ok {
 			if keyMsg.String() == "enter" {
 				if len(m.search.articles.Pages) > 0 {
 					// 2. Grab the specific article based on the search cursor
 					selectedArticle := m.search.articles.Pages[m.search.cursor]
-					markdown, err := fetchAndParseArticle(m.client, selectedArticle.Key)
-					if err != nil {
-						fmt.Printf("Failed to fetch article: %v", err)
-					}
-					m.article.article = selectedArticle
-					m.article.markdown = markdown
-					m.article.rendered = applyGlamour(m.article.markdown, m.width)
-					// 3. Assign it to the article model
-					m.article.viewport = viewport.New(viewport.WithWidth(m.width), viewport.WithHeight(m.height))
-					m.article.viewport.SetContent(m.article.rendered)
-					// 4. Switch the state
 					m.state = articleState
-
-					// 5. Important: Return immediately to stop the search model
-					// from processing 'enter' further
-					return m, nil
+					m.article.rendered = ""
+					return m, fetchArticleCmd(m.client, selectedArticle)
 				}
 			}
 		}
 	case articleState:
 		newArticle, articleCmd := m.article.Update(msg)
-		m.article = newArticle.(articleModel)
+		m.article = newArticle
 		cmd = articleCmd
 
 		// Handle going back to search
@@ -250,6 +248,9 @@ func (m model) View() tea.View {
 	return v
 }
 func (m articleModel) View() tea.View {
+	if (m.rendered == ""){
+		return tea.NewView("Loading article...")
+	}
 	return tea.NewView(m.viewport.View())
 }
 
@@ -290,6 +291,21 @@ func (m searchModel) footerView() string {
 type errMsg struct{ err error }
 
 func (e errMsg) Error() string { return e.err.Error() }
+
+// 1. A message to carry the result back
+type articleFetchedMsg struct {
+	article  wikiPage
+	markdown string
+	err      error
+}
+
+// 2. A command that does the work off the main loop
+func fetchArticleCmd(client *http.Client, page wikiPage) tea.Cmd {
+	return func() tea.Msg {
+		markdown, err := fetchAndParseArticle(client, page.Key)
+		return articleFetchedMsg{article: page, markdown: markdown, err: err}
+	}
+}
 
 func fetchSearchResults(ctx context.Context, client *http.Client, searchQuery string) tea.Cmd {
 	return func() tea.Msg {

@@ -13,12 +13,18 @@ import (
 	tea "charm.land/bubbletea/v2"
 )
 
-type searchCancelledMsg struct{}
-type debounceMsg struct {
-	tag   int
-	query string
-}
 type sessionState int
+
+//  ---MODELS---
+
+type model struct {
+	state   sessionState
+	search  searchModel
+	article articleModel
+	width   int
+	height  int
+}
+
 type searchModel struct {
 	articles    wikiSearchResponse
 	cursor      int
@@ -26,20 +32,23 @@ type searchModel struct {
 	cancel      context.CancelFunc
 	debounceTag int
 }
+
 type articleModel struct {
-	article wikiPage
+	article  wikiPage
 	rendered string
-}
-type model struct {
-	state   sessionState
-	search  searchModel
-	article articleModel
 }
 
 const (
 	searchState sessionState = iota
 	articleState
 )
+
+type searchCancelledMsg struct{}
+
+type debounceMsg struct {
+	tag   int
+	query string
+}
 
 func debounceCmd(tag int, query string) tea.Cmd {
 	return func() tea.Msg {
@@ -161,7 +170,15 @@ func (m articleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmd tea.Cmd
+	switch msg := msg.(type) {
+	// 1. You are matching the TYPE 'tea.WindowSizeMsg'
+	case tea.WindowSizeMsg:
+		m.width = msg.Width
+		m.height = msg.Height
+
+	}
 	switch m.state {
+
 	case searchState:
 		newSearch, searchCmd := m.search.Update(msg)
 		// 2. Cast it back to our specific type
@@ -173,7 +190,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// 2. Grab the specific article based on the search cursor
 					selectedArticle := m.search.articles.Pages[m.search.cursor]
 					m.article.rendered = renderArticle(selectedArticle.Key)
-						// 3. Assign it to the article model
+					// 3. Assign it to the article model
 					m.article.article = selectedArticle
 
 					// 4. Switch the state
@@ -198,6 +215,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, cmd
 }
+
 // ----- VIEW ----- //
 
 func (m model) View() tea.View {
@@ -209,7 +227,7 @@ func (m model) View() tea.View {
 	default:
 		v = m.search.View()
 	}
-	v.AltScreen = false
+	v.AltScreen = true
 	return v
 }
 func (m articleModel) View() tea.View {
@@ -226,6 +244,7 @@ func (m searchModel) View() tea.View {
 
 	return tea.NewView(str)
 }
+
 // Helper for the title
 func (m searchModel) headerView() string {
 	return "\n  Wikipedia Search Results:\n"

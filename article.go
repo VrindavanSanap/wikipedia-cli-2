@@ -2,10 +2,8 @@ package main
 
 import (
 	"fmt"
-	"io"
 	"log"
 	"net/http"
-	"net/url"
 	"regexp"
 	"strings"
 	"time"
@@ -148,21 +146,6 @@ var articleRenderStyles = ansi.StyleConfig{
 
 var httpClient = &http.Client{Timeout: 15 * time.Second}
 
-func fetchArticleHTML(key string) (string, error) {
-	reqURL := "https://en.wikipedia.org/w/rest.php/v1/page/" + url.PathEscape(key) + "/html"
-	req, _ := http.NewRequest("GET", reqURL, nil)
-	req.Header.Set("User-Agent", "wikipedia-live-cli/1.0")
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-	if resp.StatusCode != http.StatusOK {
-		return "", fmt.Errorf("HTTP %d", resp.StatusCode)
-	}
-	body, err := io.ReadAll(resp.Body)
-	return string(body), err
-}
 
 // ── HTML pre-cleaner ──────────────────────────────────────────────────────────
 
@@ -296,29 +279,27 @@ func markdownFromHTML(htmlContent string) (string, error) {
 }
 
 // ── Main Execution ────────────────────────────────────────────────────────────
+func fetchAndParseArticle(articleKey string) (string, error) {
+	htmlContent, err := fetchArticle(articleKey)
+	if err != nil {
+		return "", err
+	}
+	cleanedHTML := cleanHTML(htmlContent)
+	markdown, err := markdownFromHTML(cleanedHTML)
+	if err != nil {
+		return "", err
+	}
+	markdown = cleanMarkdown(markdown)
+	return markdown, nil
 
+}
 func renderArticle(articleKey string)string {
 	terminalWidth := 100
 
 	fmt.Printf("Fetching %s...\n\n", articleKey)
 
 	// 1. Fetch
-	htmlContent, err := fetchArticleHTML(articleKey)
-	if err != nil {
-		log.Fatalf("Failed to fetch article: %v", err)
-	}
-
-	// 2. Pre-clean DOM (stripping references, edit links, etc.)
-	cleanedHTML := cleanHTML(htmlContent)
-
-	// 3. Convert to Markdown
-	md, err := markdownFromHTML(cleanedHTML)
-	if err != nil {
-		log.Fatalf("Failed to convert HTML to Markdown: %v", err)
-	}
-
-	// 4. Post-clean Markdown
-	md = cleanMarkdown(md)
+	markdown, err := fetchAndParseArticle(articleKey)
 
 	// 5. Render with Glamour using the custom style struct
 	r, err := glamour.NewTermRenderer(
@@ -329,7 +310,7 @@ func renderArticle(articleKey string)string {
 		log.Fatalf("Failed to setup renderer: %v", err)
 	}
 
-	rendered, err := r.Render(md)
+	rendered, err := r.Render(markdown)
 	if err != nil {
 		log.Fatalf("Failed to render markdown: %v", err)
 	}

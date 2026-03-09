@@ -297,8 +297,7 @@ func markdownFromHTML(htmlContent string) (string, error) {
 
 // ── Main Execution ────────────────────────────────────────────────────────────
 
-func renderArticle() {
-	articleKey := "PewDiePie"
+func renderArticle(articleKey string)string {
 	terminalWidth := 100
 
 	fmt.Printf("Fetching %s...\n\n", articleKey)
@@ -335,5 +334,5 @@ func renderArticle() {
 		log.Fatalf("Failed to render markdown: %v", err)
 	}
 
-	fmt.Println(rendered)
+	return rendered
 }

@@ -28,6 +28,7 @@ type searchModel struct {
 }
 type articleModel struct {
 	article wikiPage
+	rendered string
 }
 type model struct {
 	state   sessionState
@@ -74,6 +75,8 @@ func (m articleModel) Init() tea.Cmd {
 var wikiClient = &http.Client{
 	Timeout: 15 * time.Second,
 }
+
+// ------ UPDATE -------
 
 func (m searchModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	var cmds []tea.Cmd
@@ -169,8 +172,8 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				if len(m.search.articles.Pages) > 0 {
 					// 2. Grab the specific article based on the search cursor
 					selectedArticle := m.search.articles.Pages[m.search.cursor]
-
-					// 3. Assign it to the article model
+					m.article.rendered = renderArticle(selectedArticle.Key)
+						// 3. Assign it to the article model
 					m.article.article = selectedArticle
 
 					// 4. Switch the state
@@ -195,16 +198,22 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	}
 	return m, cmd
 }
+// ----- VIEW ----- //
+
 func (m model) View() tea.View {
+	var v tea.View
 	switch m.state {
 	case articleState:
-		return m.article.View()
+		v = m.article.View()
+
 	default:
-		return m.search.View()
+		v = m.search.View()
 	}
+	v.AltScreen = false
+	return v
 }
 func (m articleModel) View() tea.View {
-	return tea.NewView(m.article.Title)
+	return tea.NewView(m.rendered)
 }
 
 func (m searchModel) View() tea.View {
@@ -217,7 +226,6 @@ func (m searchModel) View() tea.View {
 
 	return tea.NewView(str)
 }
-
 // Helper for the title
 func (m searchModel) headerView() string {
 	return "\n  Wikipedia Search Results:\n"

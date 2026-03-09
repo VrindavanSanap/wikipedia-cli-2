@@ -1,12 +1,40 @@
-# Inside .goreleaser.yaml
+version: 2
+project_name: wikipedia-cli
+
+before:
+  hooks:
+    - go mod tidy
+
 builds:
   - env:
       - CGO_ENABLED=0
-    goos:           # <--- Operating Systems
+    goos:
       - linux
       - darwin
       - windows
-    goarch:         # <--- Processor Architectures
+    goarch:
       - amd64
       - arm64
-    main: .
+    main: . 
+
+archives:
+  - format: tar.gz
+    format_overrides:
+      - goos: windows
+        format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - readme.md
+
+# THIS IS THE PART YOU ARE MISSING:
+brews:
+  - name: wikipedia-cli
+    repository:
+      owner: VrindavanSanap # Your GitHub username
+      name: homebrew-tap    # Your tap repository name
+      token: "{{ .Env.TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: "https://github.com/VrindavanSanap/wikipedia-cli"
+    description: "A command-line Wikipedia client built with Bubble Tea"
+    license: "MIT"

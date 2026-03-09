@@ -1,3 +1,5 @@
+// Copyright (c) 2026 Vrindavan Sanap. MIT License.
+
 package main
 
 import (

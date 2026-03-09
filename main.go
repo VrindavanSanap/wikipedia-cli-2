@@ -9,9 +9,11 @@ import (
 	"strings"
 	"time"
 
+	"charm.land/bubbles/v2/spinner"
 	"charm.land/bubbles/v2/textinput"
 	"charm.land/bubbles/v2/viewport"
 	tea "charm.land/bubbletea/v2"
+	"charm.land/lipgloss/v2"
 )
 
 type sessionState int
@@ -41,6 +43,7 @@ type articleModel struct {
 	markdown string
 	rendered string
 	viewport viewport.Model
+	spinner  spinner.Model
 }
 
 const (
@@ -61,6 +64,13 @@ func debounceCmd(tag int, query string) tea.Cmd {
 		return debounceMsg{tag: tag, query: query}
 	}
 }
+func initialArticleModel() articleModel {
+
+	s := spinner.New()
+	s.Spinner = spinner.Dot
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("205"))
+	return articleModel{spinner: s}
+}
 
 func initialModel(client *http.Client) model {
 	ti := textinput.New()
@@ -76,6 +86,7 @@ func initialModel(client *http.Client) model {
 			cursor:    0,
 			textInput: ti,
 		},
+		article: initialArticleModel(),
 	}
 }
 func (m model) Init() tea.Cmd {
@@ -162,8 +173,15 @@ func (m searchModel) Update(msg tea.Msg) (searchModel, tea.Cmd) {
 
 }
 func (m articleModel) Update(msg tea.Msg) (articleModel, tea.Cmd) {
-	var cmd tea.Cmd
 	var cmds []tea.Cmd
+	var cmd tea.Cmd
+
+	// keep spinner animating while we're waiting for content
+	m.spinner, cmd = m.spinner.Update(msg)
+	if cmd != nil && m.rendered == "" {
+		cmds = append(cmds, cmd)
+	}
+
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
@@ -178,7 +196,9 @@ func (m articleModel) Update(msg tea.Msg) (articleModel, tea.Cmd) {
 		m.viewport.SetContent(m.rendered)
 	}
 	m.viewport, cmd = m.viewport.Update(msg)
-	cmds = append(cmds, cmd)
+	if cmd != nil {
+		cmds = append(cmds, cmd)
+	}
 	return m, tea.Batch(cmds...)
 }
 func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
@@ -214,8 +234,13 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 					// 2. Grab the specific article based on the search cursor
 					selectedArticle := m.search.articles.Pages[m.search.cursor]
 					m.state = articleState
+					m.article.article = selectedArticle
+					m.article.markdown = ""
 					m.article.rendered = ""
-					return m, fetchArticleCmd(m.client, selectedArticle)
+					return m, tea.Batch(
+						fetchArticleCmd(m.client, selectedArticle),
+						m.article.spinner.Tick,
+					)
 				}
 			}
 		}
@@ -248,8 +273,8 @@ func (m model) View() tea.View {
 	return v
 }
 func (m articleModel) View() tea.View {
-	if (m.rendered == ""){
-		return tea.NewView("Loading article...")
+	if m.rendered == "" {
+		return tea.NewView(fmt.Sprintf("%s Loading article: %s", m.spinner.View(), m.article.Title))
 	}
 	return tea.NewView(m.viewport.View())
 }

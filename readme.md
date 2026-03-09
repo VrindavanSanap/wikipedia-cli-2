@@ -9,6 +9,14 @@ A command-line Wikipedia client built with the [Bubble Tea](https://github.com/c
 ## Requirements
 - Go 1.26.1 or newer
 
+## Install with Homebrew
+Install via the custom tap:
+
+```bash
+brew tap vrindavansanap/tap
+brew install wikipedia-cli
+```
+
 ## Setup
 Clone the repository and install dependencies:
 

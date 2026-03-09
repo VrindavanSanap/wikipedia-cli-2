@@ -1,10 +1,8 @@
 version: 2
 project_name: wikipedia-cli
-
 before:
   hooks:
     - go mod tidy
-
 builds:
   - env:
       - CGO_ENABLED=0
@@ -16,7 +14,6 @@ builds:
       - amd64
       - arm64
     main: . 
-
 archives:
   - format: tar.gz
     format_overrides:
@@ -26,13 +23,13 @@ archives:
     files:
       - LICENSE
       - readme.md
-
-# THIS IS THE PART YOU ARE MISSING:
+release:
+  replace_existing_artifacts: true
 brews:
   - name: wikipedia-cli
     repository:
-      owner: VrindavanSanap # Your GitHub username
-      name: homebrew-tap    # Your tap repository name
+      owner: VrindavanSanap
+      name: homebrew-tap
       token: "{{ .Env.TAP_GITHUB_TOKEN }}"
     directory: Formula
     homepage: "https://github.com/VrindavanSanap/wikipedia-cli"

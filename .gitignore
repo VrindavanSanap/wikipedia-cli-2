@@ -1,1 +1,13 @@
-bin/
+# The binary you just deleted
+wikipedia-cli
+
+# Generic Go binaries
+/bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# macOS system files
+.DS_Store

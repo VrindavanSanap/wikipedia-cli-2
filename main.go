@@ -173,6 +173,9 @@ func (m articleModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 
 	case tea.WindowSizeMsg:
 		m.rendered = applyGlamour(m.markdown, msg.Width)
+		m.viewport.SetHeight(msg.Height)
+		m.viewport.SetWidth(msg.Width)
+		m.viewport.SetContent(m.rendered)
 	}
 	m.viewport, cmd = m.viewport.Update(msg)
 	cmds = append(cmds, cmd)
